@@ -13,7 +13,8 @@ class DFAStrategy(bt.Strategy):
     params = (
         ('base_cash', 500),  # 每期基础投资金额
         ('ma_period', 120),  # 移动平均线周期
-        ('investment_interval', 30),  # 投资间隔（天）
+        ('investment_interval', 14),  # 投资间隔改为14天
+        ('target_return', 50),  # 目标收益率50%止盈
         ('printlog', True),  # 打印交易日志
     )
     
@@ -27,9 +28,17 @@ class DFAStrategy(bt.Strategy):
         
         # 记录投资历史
         self.investment_history = []
+        
+        # 记录交易历史和收益率
+        self.trade_history = []
+        self.total_invested = 0  # 总投资金额
+        self.total_shares = 0    # 总持有份额
 
     def next(self):
-        # 检查是否到了投资日（每30天投资一次）
+        # 检查止盈条件
+        self.check_profit_taking()
+        
+        # 检查是否到了投资日（每14天投资一次）
         current_date = self.datas[0].datetime.date(0)
         
         if self.last_investment_date is None:
@@ -71,6 +80,10 @@ class DFAStrategy(bt.Strategy):
             if size > 0:
                 self.buy(size=size)
                 
+                # 更新总投资信息
+                self.total_invested += investment_amount
+                self.total_shares += size
+                
                 # 记录投资信息
                 self.investment_count += 1
                 self.last_investment_date = self.datas[0].datetime.date(0)
@@ -90,6 +103,39 @@ class DFAStrategy(bt.Strategy):
                     self.log(f'第{self.investment_count}期投资: 价格${current_price:.2f}, '
                            f'偏离度{deviation:.1f}%, 乘数{multiplier:.1f}, '
                            f'金额${investment_amount:.2f}, 份额{size}')
+
+    def check_profit_taking(self):
+        """检查止盈条件"""
+        if self.total_shares > 0:
+            current_price = self.datas[0].close[0]
+            current_value = self.total_shares * current_price
+            
+            # 计算当前收益率
+            if self.total_invested > 0:
+                current_return = (current_value - self.total_invested) / self.total_invested * 100
+                
+                # 如果收益率达到目标，卖出全部持仓
+                if current_return >= self.params.target_return:
+                    self.sell(size=self.total_shares)
+                    
+                    # 记录止盈信息
+                    profit_info = {
+                        'date': self.datas[0].datetime.date(0),
+                        'price': current_price,
+                        'return_percent': current_return,
+                        'shares_sold': self.total_shares,
+                        'amount_received': current_value
+                    }
+                    self.trade_history.append(profit_info)
+                    
+                    if self.params.printlog:
+                        self.log(f'🎯 止盈卖出: 收益率{current_return:.1f}%, '
+                               f'价格${current_price:.2f}, 份额{self.total_shares}, '
+                               f'获得${current_value:.2f}')
+                    
+                    # 重置持仓信息
+                    self.total_invested = 0
+                    self.total_shares = 0
 
     def get_investment_multiplier(self, deviation):
         """根据偏离度返回投资乘数"""
@@ -115,12 +161,15 @@ class DFAStrategy(bt.Strategy):
 
     def stop(self):
         """策略结束时的分析"""
-        print('\n=== DFA策略回测结果 ===')
+        print('\n' + '='*60)
+        print('DFA策略回测结果')
+        print('='*60)
         print(f'总期数: {self.investment_count}')
         print(f'最终资产: ${self.broker.getvalue():.2f}')
+        
         initial_value = 10000
         total_return = ((self.broker.getvalue() / initial_value) - 1) * 100
-        print(f'总回报: {total_return:.1f}%')
+        print(f'总回报率: {total_return:.2f}%')
         
         # 显示投资历史
         if self.investment_history:
@@ -129,6 +178,13 @@ class DFAStrategy(bt.Strategy):
             print(f"平均偏离度: {df['deviation'].mean():.1f}%")
             print(f"平均投资乘数: {df['multiplier'].mean():.2f}")
             print(f"总投资金额: ${df['amount'].sum():.2f}")
+        
+        # 显示止盈历史
+        if self.trade_history:
+            print(f"\n🎯 止盈记录:")
+            for trade in self.trade_history:
+                print(f"  {trade['date']}: 收益率{trade['return_percent']:.1f}%, "
+                      f"价格${trade['price']:.2f}, 获得${trade['amount_received']:.2f}")
 
 def fetch_binance_data(symbol='SOLUSDT', timeframe='1d', limit=1000):
     """
@@ -139,19 +195,14 @@ def fetch_binance_data(symbol='SOLUSDT', timeframe='1d', limit=1000):
     """
     print(f"正在从币安获取 {symbol} 数据...")
 
-    proxies = {
-        'http': 'http://10.48.175.246:7897', 
-        'https': 'http://10.48.175.246:7897', 
-    }
-    
-    # 创建币安交易所实例（不需要API密钥即可获取公开数据）
     exchange = ccxt.binance({
-        'enableRateLimit': True,  # 启用速率限制
-        'options': {
-            'defaultType': 'spot',  # 现货市场
-        }
+        'enableRateLimit': True,
+        'proxies': {
+            'http': 'http://10.48.175.246:7897',
+            'https': 'http://10.48.175.246:7897',
+        },
+        'timeout': 30000,
     })
-    
     try:
         # 获取K线数据
         ohlcv = exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
@@ -192,7 +243,7 @@ def run_dfa_binance_backtest(symbol='SOLUSDT', timeframe='1d', data_limit=1000):
         print(f"无法获取 {symbol} 数据，退出回测")
         return
     
-    # 创建Backtrader数据源
+    # 创建Backtrader数据源 - 确保时间显示正确
     data = bt.feeds.PandasData(
         dataname=data_df,
         datetime=None,  # 使用index作为日期
@@ -211,6 +262,7 @@ def run_dfa_binance_backtest(symbol='SOLUSDT', timeframe='1d', data_limit=1000):
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trades')
+    cerebro.addanalyzer(bt.analyzers.TimeReturn, _name='timereturn')
     
     print(f'初始资金: ${cerebro.broker.getvalue():.2f}')
     
@@ -220,9 +272,9 @@ def run_dfa_binance_backtest(symbol='SOLUSDT', timeframe='1d', data_limit=1000):
     strat = results[0]
     
     # 输出分析结果
-    print('\n' + '='*50)
-    print('DFA策略回测结果')
-    print('='*50)
+    print('\n' + '='*60)
+    print('策略绩效分析')
+    print('='*60)
     
     # 基本绩效
     final_value = cerebro.broker.getvalue()
@@ -230,6 +282,8 @@ def run_dfa_binance_backtest(symbol='SOLUSDT', timeframe='1d', data_limit=1000):
     print(f'初始资金: ${initial_cash:.2f}')
     print(f'最终资产: ${final_value:.2f}')
     print(f'总回报率: {total_return:.2f}%')
+    print(f'投资期数: {strat.investment_count}')
+    print(f'止盈次数: {len(strat.trade_history)}')
     
     # 分析器结果
     try:
@@ -263,9 +317,16 @@ def run_dfa_binance_backtest(symbol='SOLUSDT', timeframe='1d', data_limit=1000):
     except:
         pass
     
-    # 绘制图表
+    # 绘制图表 - 改进图表显示
     print('\n生成图表...')
-    cerebro.plot(style='candlestick', volume=False)
+    cerebro.plot(
+        style='candlestick', 
+        volume=False,
+        barup='green', 
+        bardown='red',
+        plotdist=1.0,
+        subtxtsize=8
+    )
 
 def test_multiple_crypto_assets():
     """测试多个加密货币资产"""
@@ -273,27 +334,22 @@ def test_multiple_crypto_assets():
         ('SOLUSDT', 'Solana'),
         ('BTCUSDT', 'Bitcoin'),
         ('ETHUSDT', 'Ethereum'),
-        ('ADAUSDT', 'Cardano'),
-        ('DOTUSDT', 'Polkadot'),
     ]
     
     for symbol, name in crypto_assets:
         print(f'\n{"="*60}')
         print(f'测试资产: {name} ({symbol})')
         print(f'{"="*60}')
-        run_dfa_binance_backtest(symbol=symbol, data_limit=500)  # 限制数据量以提高速度
+        run_dfa_binance_backtest(symbol=symbol, data_limit=500)
         time.sleep(1)  # 避免请求过于频繁
 
 # 运行示例
 if __name__ == '__main__':
-    # 首先安装所需库: pip install backtrader ccxt pandas
+    print("开始DFA策略回测（14天定投，50%止盈）")
+    print("=" * 60)
     
     # 方法1: 测试单个资产
-    print("开始DFA策略回测（使用币安真实数据）")
     run_dfa_binance_backtest(symbol='SOLUSDT', data_limit=1000)
     
     # 方法2: 测试多个资产 (取消注释以下行)
     # test_multiple_crypto_assets()
-    
-    # 方法3: 测试其他时间周期
-    # run_dfa_binance_backtest(symbol='BTCUSDT', timeframe='1w')  # 周线数据
