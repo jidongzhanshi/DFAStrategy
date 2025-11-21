@@ -1,158 +1,171 @@
-# DFA动态定投策略
+# DFA Dynamic Fund Averaging Strategy
 
-## 策略概述
+## Strategy Overview
 
-DFA（Dynamic Fund Averaging）动态定投策略是一种基于技术指标的智能定投策略。该策略通过分析价格与移动平均线的偏离度来动态调整每期投资金额，并在达到目标收益率时自动减仓锁定利润。
+DFA (Dynamic Fund Averaging) is an intelligent dollar-cost averaging strategy based on technical indicators. The strategy dynamically adjusts investment amounts based on price deviation from moving averages and automatically takes profits by reducing positions when target returns are achieved.
 
-## 策略特点
+## Strategy Features
 
-### 🎯 核心特性
-- **动态投资**：根据价格偏离度调整投资金额
-- **自动止盈**：达到75%收益率时自动减仓50%
-- **冷却机制**：避免频繁交易，设置30天减仓冷却期
-- **精确计算**：支持小数份额，精确计算成本和收益
+### 🎯 Core Characteristics
+- **Dynamic Investment**: Adjusts investment amount based on price deviation
+- **Auto Profit-Taking**: Automatically reduces 50% position at 75% return target
+- **Cooling Mechanism**: 30-day cooldown period prevents overtrading
+- **Precision Calculation**: Supports fractional shares with accurate cost and profit tracking
 
-### 📊 投资逻辑
-- **基础定投**：每14天投资一次，基础金额70美元
-- **偏离度调整**：价格低于MA120时加大投资，高于时减少投资
-- **风险控制**：价格极度高估时暂停投资
+### 📊 Investment Logic
+- **Regular Investment**: Invest every 14 days with $70 base amount
+- **Deviation Adjustment**: Increase investment when price is below MA120, decrease when above
+- **Risk Control**: Pause investment during extreme overvaluation
 
-## 策略参数
+## Strategy Parameters
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| base_cash | 70 | 每期基础投资金额（美元） |
-| ma_period | 120 | 移动平均线周期 |
-| investment_interval | 14 | 投资间隔天数 |
-| target_return | 75 | 目标收益率（%） |
-| sell_ratio | 0.5 | 减仓比例 |
-| profit_taking_cooldown | 30 | 减仓冷却天数 |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| base_cash | 70 | Base investment amount per period (USD) |
+| ma_period | 120 | Moving average period |
+| investment_interval | 14 | Investment interval in days |
+| target_return | 75 | Target return rate (%) |
+| sell_ratio | 0.5 | Position reduction ratio |
+| profit_taking_cooldown | 30 | Profit-taking cooldown days |
 
-## 投资乘数规则
+## Investment Multiplier Rules
 
-| 偏离度范围 | 投资乘数 | 市场状态 |
-|------------|----------|----------|
-| ≤ -20% | 2.2 | 极度低估 |
-| -20% ~ -10% | 1.8 | 显著低估 |
-| -10% ~ 0% | 1.4 | 正常偏低 |
-| 0% ~ 5% | 1.0 | 正常估值 |
-| 5% ~ 15% | 0.5 | 正常偏高 |
-| 15% ~ 25% | 0.2 | 显著高估 |
-| > 25% | 0.0 | 极度高估 |
+| Deviation Range | Multiplier | Market Condition |
+|-----------------|------------|------------------|
+| ≤ -20% | 2.2 | Extreme Undervaluation |
+| -20% ~ -10% | 1.8 | Significant Undervaluation |
+| -10% ~ 0% | 1.4 | Normal Low |
+| 0% ~ 5% | 1.0 | Normal Valuation |
+| 5% ~ 15% | 0.5 | Normal High |
+| 15% ~ 25% | 0.2 | Significant Overvaluation |
+| > 25% | 0.0 | Extreme Overvaluation |
 
-## 文件结构
+## File Structure
 
 ```
 dfa_strategy/
-├── dfa_strategy.py      # 主要策略代码
-├── README.md           # 说明文档
-└── requirements.txt    # 依赖包
+├── dfa_strategy.py      # Main strategy code
+├── README.md           # Documentation
+└── requirements.txt    # Dependencies
 ```
 
-## 安装依赖
+## Installation
 
 ```bash
 pip install backtrader pandas ccxt
 ```
 
-## 使用方法
+## Usage
 
-### 基本使用
+### Basic Usage
 ```python
-# 运行SOLUSDT回测
+# Run SOLUSDT backtest
 python dfa_strategy.py
 
-# 运行其他币种回测
+# Run other cryptocurrency backtests
 run_dfa_binance_backtest(symbol='BTCUSDT', data_limit=1000)
 run_dfa_binance_backtest(symbol='ETHUSDT', data_limit=1000)
 ```
 
-### 自定义参数
+### Custom Parameters
 ```python
-# 在DFAStrategy的params中修改
+# Modify in DFAStrategy params
 params = (
-    ('base_cash', 100),      # 修改基础投资金额
-    ('investment_interval', 7),  # 修改为每周定投
-    ('target_return', 50),   # 修改目标收益率
-    # ... 其他参数
+    ('base_cash', 100),      # Change base investment amount
+    ('investment_interval', 7),  # Change to weekly investment
+    ('target_return', 50),   # Modify target return rate
+    # ... other parameters
 )
 ```
 
-## 输出报告
+## Output Report
 
-策略运行后会生成详细的回测报告：
-回测1000天SOLUSDT数据：
-<img width="640" height="480" alt="Figure_0" src="https://github.com/user-attachments/assets/880d36b0-14c9-4cc1-96c8-cb294e9d1588" />
+The strategy generates detailed backtest reports:
 
+Backtest results for 1000 days of SOLUSDT data:
 
-### 📊 财务概览
-- 实际总投资金额
-- 当前持仓成本和价值
-- 已实现利润和总卖出金额
-- 基于投资的总回报率和年化回报率
+<img width="640" height="480" alt="Figure_0" src="https://github.com/user-attachments/assets/d3bac171-a646-4bef-94ec-51224da0f7e6" />
 
-### 📈 投资历史
-- 平均偏离度和投资乘数
-- 总投资金额统计
-- 最大最小单次投资
+### 📊 Financial Overview
+- Actual total investment amount
+- Current position cost and value
+- Realized profits and total sell amount
+- Total return rate and annualized return based on actual investment
 
-### 🎯 减仓记录
-- 每次减仓的详细记录
-- 减仓统计和利润/投资比
+### 📈 Investment History
+- Average deviation and investment multiplier
+- Total investment statistics
+- Maximum and minimum single investments
 
-## 策略优势
+### 🎯 Profit-Taking Records
+- Detailed records of each position reduction
+- Profit-taking statistics and profit/investment ratio
 
-### ✅ 资金效率高
-- 只在低估时加大投资
-- 高估时减少或暂停投资
-- 自动止盈锁定利润
+## Strategy Advantages
 
-### ✅ 风险控制
-- 避免追涨杀跌
-- 冷却机制防止过度交易
-- 基于实际投资成本计算收益
+### ✅ High Capital Efficiency
+- Increase investment only during undervaluation
+- Reduce or pause investment during overvaluation
+- Automatically lock in profits
 
-### ✅ 适应性强
-- 适用于各种加密货币
-- 参数可灵活调整
-- 支持不同市场环境
+### ✅ Risk Control
+- Avoid chasing rallies and selling in panic
+- Cooling mechanism prevents excessive trading
+- Accurate profit calculation based on actual investment cost
 
-## 性能指标
+### ✅ Strong Adaptability
+- Suitable for various cryptocurrencies
+- Flexible parameter adjustment
+- Supports different market environments
 
-策略会计算以下关键指标：
-- **总回报率**：基于实际投资成本的回报
-- **年化回报率**：年化后的投资回报
-- **利润/投资比**：已实现利润占总投资的比例
-- **减仓次数**：策略执行减仓的次数
+## Performance Metrics
 
-## 注意事项
+The strategy calculates the following key metrics:
+- **Total Return Rate**: Return based on actual investment cost
+- **Annualized Return**: Annualized investment return
+- **Profit/Investment Ratio**: Realized profit as percentage of total investment
+- **Profit-Taking Count**: Number of position reduction operations
 
-1. **数据来源**：策略使用币安API获取数据，需要稳定的网络连接
-2. **代理设置**：代码中包含代理设置，根据实际网络环境调整
-3. **回测限制**：历史数据可能不包含所有市场情况，实际表现可能有所不同
-4. **风险提示**：加密货币投资具有高风险，请在充分了解风险后使用
+## Important Notes
 
-## 自定义建议
+1. **Applicable Scenarios**: This strategy employs a dollar-cost averaging approach, making it suitable primarily for spot market long-term investments
+2. **Data Source**: Strategy uses Binance API for data, requires stable internet connection
+3. **Proxy Settings**: Code includes proxy settings, adjust according to your network environment
+4. **Backtest Limitations**: Historical data may not include all market conditions, actual performance may vary
+5. **Risk Warning**: Cryptocurrency investment carries high risks, use only after fully understanding the risks
 
-### 🎨 参数优化
-- 根据不同币种的波动性调整`target_return`
-- 根据投资频率调整`investment_interval`
-- 根据风险偏好调整投资乘数规则
+## Customization Suggestions
 
-### 🔧 功能扩展
-- 添加止损机制
-- 支持多币种同时投资
-- 添加邮件/短信通知功能
+### 🎨 Parameter Optimization
+- Adjust `target_return` based on different cryptocurrency volatility
+- Modify `investment_interval` according to investment frequency
+- Customize investment multiplier rules based on risk preference
 
-## 版本历史
+### 🔧 Feature Extensions
+- Add stop-loss mechanisms
+- Support multiple cryptocurrency simultaneous investment
+- Add email/SMS notification functionality
 
-- v1.0：基础DFA策略实现
-- v1.1：添加减仓冷却机制，优化份额计算和财务报告
+## Version History
+- v1.0: Basic DFA strategy implementation
+- v1.1: Added profit-taking cooling mechanism, optimized share calculation and financial reporting
 
-## 技术支持
+## Future Development Plans
 
-如有问题或建议，请提交Issue或联系开发团队。
+### Phase 1: Technical Indicator Enhancement (Short-term Goals)
+1. RSI indicator integration
+2. Multiple timeframe MA indicators
+3. MACD indicator implementation
+
+### Phase 2: Risk Management Enhancement (Medium-term Goals)
+1. Dynamic stop-loss mechanisms
+2. Position management optimization
+3. Market regime identification
+
+## Technical Support
+
+For issues or suggestions, please submit an Issue or contact the development team.
 
 ---
 
-**免责声明**：本策略仅供学习和研究使用，不构成投资建议。使用者应自行承担投资风险。
+**Disclaimer**: This strategy is for learning and research purposes only and does not constitute investment advice. Users should bear investment risks independently.
