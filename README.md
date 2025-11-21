@@ -81,6 +81,9 @@ params = (
 ## 输出报告
 
 策略运行后会生成详细的回测报告：
+回测1000天SOLUSDT数据：
+<img width="640" height="480" alt="Figure_0" src="https://github.com/user-attachments/assets/880d36b0-14c9-4cc1-96c8-cb294e9d1588" />
+
 
 ### 📊 财务概览
 - 实际总投资金额
@@ -144,8 +147,7 @@ params = (
 ## 版本历史
 
 - v1.0：基础DFA策略实现
-- v1.1：添加减仓冷却机制
-- v1.2：优化份额计算和财务报告
+- v1.1：添加减仓冷却机制，优化份额计算和财务报告
 
 ## 技术支持
 
